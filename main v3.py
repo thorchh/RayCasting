@@ -17,7 +17,6 @@ dispH = 400
 sceneW = 400
 sceneH = 400
 
-
 lines = 400
 
 gameDisplay = pygame.display.set_mode((dispW, dispH))
@@ -30,11 +29,23 @@ leadX = 300
 leadY = 300
 leadXChange = 0
 leadYChange = 0
+leadDirChange = 0
 
 collidePos = [0, 0]
 
 clock = pygame.time.Clock()
 
+
+def translate(value, leftMin, leftMax, rightMin, rightMax):
+    # Figure out how 'wide' each range is
+    leftSpan = leftMax - leftMin
+    rightSpan = rightMax - rightMin
+
+    # Convert the left range into a 0-1 range (float)
+    valueScaled = float(value - leftMin) / float(leftSpan)
+
+    # Convert the 0-1 range into a value in the right range.
+    return rightMin + (valueScaled * rightSpan)
 
 
 class Boundary:
@@ -72,6 +83,9 @@ class Ray:
     def show(self):
         pygame.draw.line(gameDisplay, white, self.pos, (self.dir * 10) + self.pos)
 
+    def updateDir(self,angle):
+        self.dir.rotate_ip_rad(angle)
+
     def cast(self, boundary):
         cx1 = boundary.a.x
         cy1 = boundary.a.y
@@ -102,10 +116,11 @@ class Particle:
 
     def __init__(self):
         w, h = pygame.display.get_surface().get_size()
-        self.pos = pygame.Vector2(w / 2, h / 2)
+        self.pos = pygame.Vector2(w / 4, h / 4)
         self.rays = []
+        self.heading = 0;
         for a in range(lines):
-            self.rays.append(Ray(self.pos, math.radians(a * 0.1)))
+            self.rays.append(Ray(self.pos, math.radians(a * 0.05)))
 
     def update(self, x, y):
         self.pos.x = x
@@ -133,9 +148,23 @@ class Particle:
                         closest = pt
             if closest:
                 pygame.draw.line(gameDisplay, white, (self.pos.x, self.pos.y), (closest.x, closest.y))
-            scene[i] = record
-
+            if record != 10000000000000000:
+                scene[j] = record
+            else:
+                scene[j] = 0
         return scene
+
+    def rotate(self, angle):
+        self.heading += angle
+        for l in range(len(particle.rays)):
+            particle.rays[l].updateDir(angle)
+
+    def move(self, amount):
+        velocity = (pygame.Vector2(1,0))
+        velocity.rotate_rad(self.heading)
+        print(velocity)
+        velocity .scale_to_length(amount)
+        self.pos.dot(velocity)
 
 
 walls = []
@@ -157,7 +186,17 @@ for i in range(5):
 particle = Particle()
 p12Change = 0
 p34Change = 0
+
 while not gameExit:
+    keys = pygame.key.get_pressed()
+    if keys[pygame.K_a]:
+        particle.rotate(0.03)
+    if keys[pygame.K_d]:
+        particle.rotate(-0.03)
+    if keys[pygame.K_w]:
+        particle.move(1)
+    if keys[pygame.K_s]:
+        particle.move(-1)
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             gameExit = True
@@ -193,21 +232,19 @@ while not gameExit:
     for wall in walls:
         wall.show()
 
-    particle.update(pygame.mouse.get_pos()[0], pygame.mouse.get_pos()[1])
     particle.show()
     scene = particle.look(walls)
-
     w = sceneW / len(scene)
     for k in range(len(scene)):
         # print (scene[i])
-        colour11 = int(scene[k])
-        if colour11 > 255:
-            colour11 = 255
-        #print(colour11)
-        # print (i)
+        sSQ = scene[k] * scene[k]
+        wSQ = sceneW * sceneW
+        hSQ = sceneH * sceneH
+        colour11 = translate(sSQ, 0, math.hypot(wSQ, hSQ), 255, 0)
+        height11 = translate(scene[k], 0, math.hypot(sceneW, sceneH) / 1.2, sceneH, 0)
 
         colour = (colour11, colour11, colour11)
-        pygame.draw.rect(gameDisplay, colour, (((k * w) + sceneW), 0, w + sceneW, dispH))
+        pygame.draw.rect(gameDisplay, colour, (((k * w) + sceneW), (sceneH - height11) / 2, w + sceneW +1, height11))
     # ray.show()
     # ray.lookAt(pygame.mouse.get_pos()[0],pygame.mouse.get_pos()[1])
     # point = ray.cast(wall)
